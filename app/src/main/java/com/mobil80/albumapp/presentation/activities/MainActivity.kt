@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,18 +16,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.BottomNavigationItem
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -37,16 +41,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
+import com.mobil80.albumapp.R
 import com.mobil80.albumapp.data.api.PhotoApi
 import com.mobil80.albumapp.data.database.PhotoDatabase
 import com.mobil80.albumapp.data.model.Photo
 import com.mobil80.albumapp.data.repository.PhotoRepository
+import com.mobil80.albumapp.presentation.ui.theme.AlbumAppTheme
 import com.mobil80.albumapp.presentation.viewmodels.PhotoViewModel
 
 class MainActivity : ComponentActivity() {
@@ -61,23 +76,71 @@ class MainActivity : ComponentActivity() {
         viewModel.fetchPhotos(1)
 
         setContent {
-            var showFavorites by remember { mutableStateOf(false) }
-
-            Column {
-                Row {
-                    Button(onClick = { showFavorites = false }) { Text("All Photos") }
-                    Button(onClick = { showFavorites = true }) { Text("Favorites") }
-                }
-
-                if (showFavorites) {
-                    FavoritesScreen(viewModel)
-                } else {
-                    PhotoScreen(viewModel)
-                }
+            AlbumAppTheme {
+                MainScreen(viewModel)
             }
         }
     }
 }
+
+@Composable
+fun MainScreen(viewModel: PhotoViewModel) {
+    val navController = rememberNavController()
+
+    Scaffold(
+        bottomBar = {
+            BottomNavigationBar(navController)
+        }
+    ) { paddingValues ->
+        NavHost(
+            navController = navController,
+            startDestination = "photos",
+            modifier = Modifier.padding(paddingValues) // Ensure proper padding for content
+        ) {
+            composable("photos") { PhotoScreen(viewModel) }
+            composable("favorites") { FavoritesScreen(viewModel) }
+        }
+    }
+}
+
+@Composable
+fun BottomNavigationBar(navController: NavController) {
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.outlineVariant,
+        modifier = Modifier.height(56.dp),
+        tonalElevation = 0.dp
+    ) {
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentRoute = navBackStackEntry?.destination?.route
+
+        BottomNavigationItem(
+            icon = {
+                Icon(
+                    Icons.Default.Home,
+                    contentDescription = "Photos",
+                    tint = if (currentRoute == "photos") colorResource(id = R.color.system_blue) else Color.Gray
+                )
+            },
+            label = { Text("All Photos") },
+            selected = currentRoute == "photos",
+            onClick = { navController.navigate("photos") }
+        )
+
+        BottomNavigationItem(
+            icon = {
+                Icon(
+                    Icons.Default.Favorite,
+                    contentDescription = "Favorites",
+                    tint = if (currentRoute == "favorites") colorResource(id = R.color.system_blue) else Color.Gray
+                )
+            },
+            label = { Text("Favorites") },
+            selected = currentRoute == "favorites",
+            onClick = { navController.navigate("favorites") }
+        )
+    }
+}
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,6 +165,7 @@ fun PhotoScreen(viewModel: PhotoViewModel) {
             },
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 10.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(Color.LightGray.copy(alpha = 0.3f)),
             placeholder = { Text("Search by ID or Author") },
@@ -155,21 +219,39 @@ fun PhotoScreen(viewModel: PhotoViewModel) {
 @Composable
 fun PhotoItem(photo: Photo, onFavoriteClick: () -> Unit) {
     Card(
+        shape = RoundedCornerShape(12.dp), // ✅ Apply corner radius to the Card itself
+        elevation = CardDefaults.elevatedCardElevation(4.dp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
     ) {
         Column {
-            AsyncImage(
-                model = photo.download_url,
-                contentDescription = "Photo by ${photo.author}",
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp)
-            )
-            Row(modifier = Modifier.padding(8.dp)) {
-                Text(text = "Author: ${photo.author}")
-                Spacer(modifier = Modifier.weight(1f))
+                    .clip(RoundedCornerShape(12.dp)) // ✅ Ensures the image has rounded corners
+            ) {
+                AsyncImage(
+                    model = photo.download_url,
+                    contentDescription = "Photo by ${photo.author}",
+                    contentScale = ContentScale.Crop, // ✅ Ensures the image fills the space properly
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically // ✅ Aligns text & button vertically
+            ) {
+                Text(
+                    text = "Author: ${photo.author}",
+                    maxLines = 2, // ✅ Ensures max two lines
+                    overflow = TextOverflow.Ellipsis, // ✅ Truncates text if too long
+                    modifier = Modifier.weight(1f) // ✅ Pushes the button to the end
+                )
                 IconButton(onClick = onFavoriteClick) {
                     Icon(
                         imageVector = if (photo.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -185,17 +267,15 @@ fun PhotoItem(photo: Photo, onFavoriteClick: () -> Unit) {
 @Composable
 fun FavoritesScreen(viewModel: PhotoViewModel) {
     val favorites by viewModel.favorites.collectAsState()
-    val isLoading by viewModel.isFavoritesLoading.collectAsState() // Observe loading state
+    val isLoading by viewModel.isFavoritesLoading.collectAsState()
 
     Column(modifier = Modifier.padding(8.dp)) {
         when {
             isLoading -> {
-                // Show Loading Indicator (3 Dots Animation)
                 LoadingIndicator()
             }
 
             favorites.isEmpty() -> {
-                // Show No Favorites Found Text
                 Text(
                     text = "No favorites found",
                     modifier = Modifier.fillMaxWidth(),
@@ -215,6 +295,7 @@ fun FavoritesScreen(viewModel: PhotoViewModel) {
         }
     }
 }
+
 
 // Loading Indicator (3 Dots Animation)
 @Composable

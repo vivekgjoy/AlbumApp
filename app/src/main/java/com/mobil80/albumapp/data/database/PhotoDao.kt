@@ -14,7 +14,7 @@ interface PhotoDao {
     fun getAllPhotos(): Flow<List<Photo>> // ✅ Must return Flow for Room + Flow support
 
     @Query("SELECT * FROM photos WHERE isFavorite = 1")
-    fun getFavoritePhotos(): List<Photo>
+    fun getFavoritePhotos(): Flow<List<Photo>>
 
     @Query("SELECT * FROM photos WHERE author LIKE '%' || :query || '%' OR id LIKE '%' || :query || '%'")
     fun searchPhotos(query: String): List<Photo>

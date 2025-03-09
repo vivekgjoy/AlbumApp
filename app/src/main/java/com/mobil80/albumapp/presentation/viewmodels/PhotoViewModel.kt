@@ -29,6 +29,10 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
 
     val isFavoritesLoading = MutableStateFlow(true) // Add this to ViewModel
 
+    init {
+        fetchFavorites() // ✅ Load favorites initially
+    }
+
     fun fetchPhotos(page: Int) {
         viewModelScope.launch {
             isLoading.value = true
@@ -39,13 +43,20 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
         }
     }
 
+    fun fetchFavorites() {
+        viewModelScope.launch {
+            isFavoritesLoading.value = true
+            repository.getFavorites().collectLatest { favList ->
+                _favorites.value = favList
+                isFavoritesLoading.value = false
+            }
+        }
+    }
+
     fun toggleFavorite(photo: Photo) {
         viewModelScope.launch(Dispatchers.IO) {
-            photo.isFavorite = !photo.isFavorite
-            isFavoritesLoading.value = true
-            repository.updateFavorite(photo)
-            _favorites.value = repository.getFavorites()
-            isFavoritesLoading.value = false
+            val updatedPhoto = photo.copy(isFavorite = !photo.isFavorite) // ✅ Create a new instance
+            repository.updateFavorite(updatedPhoto)
         }
     }
 

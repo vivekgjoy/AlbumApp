@@ -39,7 +39,7 @@ class PhotoRepository(private val api: PhotoApi, private val db: PhotoDatabase) 
         photoDao.updatePhoto(photo)
     }
 
-    fun getFavorites(): List<Photo> = photoDao.getFavoritePhotos()
+    fun getFavorites(): Flow<List<Photo>> = photoDao.getFavoritePhotos()
 
     fun searchPhotos(query: String): List<Photo> = photoDao.searchPhotos(query)
 }

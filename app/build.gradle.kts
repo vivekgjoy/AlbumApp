@@ -69,6 +69,7 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    implementation("com.google.accompanist:accompanist-systemuicontroller:0.27.0")
 
     // Paging 3 for Jetpack Compose
     implementation ("androidx.paging:paging-compose:1.0.0-alpha19")
@@ -86,4 +87,7 @@ dependencies {
     implementation ("androidx.room:room-runtime:2.5.0")
     kapt ("androidx.room:room-compiler:2.5.0")
     implementation ("androidx.room:room-ktx:2.5.0")
+
+    val nav_version = "2.8.5"
+    implementation ("androidx.navigation:navigation-compose:$nav_version")
 }
