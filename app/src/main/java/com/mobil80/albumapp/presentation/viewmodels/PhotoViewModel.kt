@@ -6,11 +6,11 @@ import androidx.paging.cachedIn
 import com.mobil80.albumapp.data.model.Photo
 import com.mobil80.albumapp.data.repository.PhotoRepository
 import kotlinx.coroutines.Dispatchers
-
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -33,11 +33,17 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
         fetchFavorites() // ✅ Load favorites initially
     }
 
+//    val pagedPhotos = repository.getPagedPhotos().cachedIn(viewModelScope)
+
     fun fetchPhotos(page: Int) {
         viewModelScope.launch {
             isLoading.value = true
             repository.getPhotos(page).collectLatest { photosList ->
-                _photos.value = photosList // ✅ Update UI
+                val favoriteIds = _favorites.value.map { it.id }.toSet() // ✅ Always check latest favorites
+
+                _photos.value = photosList.map {
+                    it.copy(isFavorite = favoriteIds.contains(it.id)) // ✅ Ensure favorite status persists
+                }
                 isLoading.value = false
             }
         }
@@ -48,6 +54,12 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
             isFavoritesLoading.value = true
             repository.getFavorites().collectLatest { favList ->
                 _favorites.value = favList
+
+                // ✅ Also update _photos list to reflect new favorites
+                _photos.value = _photos.value.map {
+                    it.copy(isFavorite = favList.any { fav -> fav.id == it.id })
+                }
+
                 isFavoritesLoading.value = false
             }
         }
@@ -55,8 +67,22 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
 
     fun toggleFavorite(photo: Photo) {
         viewModelScope.launch(Dispatchers.IO) {
-            val updatedPhoto = photo.copy(isFavorite = !photo.isFavorite) // ✅ Create a new instance
+            val updatedPhoto = photo.copy(isFavorite = !photo.isFavorite)
+
+            // ✅ Update repository (Database or API)
             repository.updateFavorite(updatedPhoto)
+
+            // ✅ Fetch the latest favorites from repository to ensure sync
+            val updatedFavorites = repository.getFavorites().first()
+
+            withContext(Dispatchers.Main) {
+                _favorites.value = updatedFavorites
+
+                // ✅ Update _photos list to reflect favorite changes
+                _photos.value = _photos.value.map {
+                    it.copy(isFavorite = updatedFavorites.any { fav -> fav.id == it.id })
+                }
+            }
         }
     }
 

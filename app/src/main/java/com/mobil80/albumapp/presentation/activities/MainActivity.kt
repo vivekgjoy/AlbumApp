@@ -156,7 +156,7 @@ fun PhotoScreen(viewModel: PhotoViewModel) {
     }
 
     Column(modifier = Modifier.padding(8.dp)) {
-        // Search Bar with Search & Clear Icons + Rounded Corners
+
         TextField(
             value = searchQuery.value,
             onValueChange = {
