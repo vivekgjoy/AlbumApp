@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,7 +41,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,6 +55,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.items
 import coil.compose.AsyncImage
 import com.mobil80.albumapp.R
 import com.mobil80.albumapp.data.api.PhotoApi
@@ -141,22 +144,15 @@ fun BottomNavigationBar(navController: NavController) {
     }
 }
 
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhotoScreen(viewModel: PhotoViewModel) {
-    val photos by viewModel.photos.collectAsState()
-    val searchResults by viewModel.searchResults.collectAsState()
+    val lazyPhotos = viewModel.pagedPhotos.collectAsLazyPagingItems()
     val searchQuery = remember { mutableStateOf("") }
-    val isLoading by viewModel.isLoading.collectAsState() // Observe loading state
-
-    LaunchedEffect(Unit) {
-        viewModel.fetchPhotos(1)
-    }
 
     Column(modifier = Modifier.padding(8.dp)) {
 
+        // Search Bar
         TextField(
             value = searchQuery.value,
             onValueChange = {
@@ -170,16 +166,10 @@ fun PhotoScreen(viewModel: PhotoViewModel) {
                 .background(Color.LightGray.copy(alpha = 0.3f)),
             placeholder = { Text("Search by ID or Author") },
             singleLine = true,
-            colors = TextFieldDefaults.textFieldColors(
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
-            ),
             trailingIcon = {
-                Row {
-                    if (searchQuery.value.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery.value = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear Search")
-                        }
+                if (searchQuery.value.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery.value = "" }) {
+                        Icon(Icons.Default.Close, contentDescription = "Clear Search")
                     }
                 }
             }
@@ -187,34 +177,102 @@ fun PhotoScreen(viewModel: PhotoViewModel) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        val displayedPhotos = if (searchQuery.value.isEmpty()) photos else searchResults
-        when {
-            isLoading -> {
-                // Show Loading Indicator (3 Dots Animation)
-                LoadingIndicator()
+        LazyColumn {
+            items(lazyPhotos) { photo ->
+                photo?.let {
+                    PhotoItem(it) { viewModel.toggleFavorite(it) }
+                }
             }
 
-            displayedPhotos.isEmpty() -> {
-                // Show No Items Found Text
-                Text(
-                    text = "No items found",
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray
-                )
-            }
-
-            else -> {
-                LazyColumn {
-                    items(displayedPhotos) { photo ->
-                        PhotoItem(photo, onFavoriteClick = { viewModel.toggleFavorite(photo) })
+            lazyPhotos.apply {
+                when {
+                    loadState.refresh is LoadState.Loading -> {
+                        item { LoadingIndicator() }
+                    }
+                    loadState.append is LoadState.Loading -> {
+                        item { CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally)) }
+                    }
+                    loadState.append is LoadState.Error -> {
+                        item { Text("Failed to load more items", Modifier.align(Alignment.CenterHorizontally)) }
                     }
                 }
             }
         }
     }
 }
+
+//@OptIn(ExperimentalMaterial3Api::class)
+//@Composable
+//fun PhotoScreen(viewModel: PhotoViewModel) {
+//    val photos by viewModel.photos.collectAsState()
+//    val searchResults by viewModel.searchResults.collectAsState()
+//    val searchQuery = remember { mutableStateOf("") }
+//    val isLoading by viewModel.isLoading.collectAsState() // Observe loading state
+//
+//    LaunchedEffect(Unit) {
+//        viewModel.fetchPhotos(1)
+//    }
+//
+//    Column(modifier = Modifier.padding(8.dp)) {
+//
+//        TextField(
+//            value = searchQuery.value,
+//            onValueChange = {
+//                searchQuery.value = it
+//                viewModel.searchPhotos(it)
+//            },
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(horizontal = 10.dp)
+//                .clip(RoundedCornerShape(12.dp))
+//                .background(Color.LightGray.copy(alpha = 0.3f)),
+//            placeholder = { Text("Search by ID or Author") },
+//            singleLine = true,
+//            colors = TextFieldDefaults.textFieldColors(
+//                focusedIndicatorColor = Color.Transparent,
+//                unfocusedIndicatorColor = Color.Transparent
+//            ),
+//            trailingIcon = {
+//                Row {
+//                    if (searchQuery.value.isNotEmpty()) {
+//                        IconButton(onClick = { searchQuery.value = "" }) {
+//                            Icon(Icons.Default.Close, contentDescription = "Clear Search")
+//                        }
+//                    }
+//                }
+//            }
+//        )
+//
+//        Spacer(modifier = Modifier.height(8.dp))
+//
+//        val displayedPhotos = if (searchQuery.value.isEmpty()) photos else searchResults
+//        when {
+//            isLoading -> {
+//                // Show Loading Indicator (3 Dots Animation)
+//                LoadingIndicator()
+//            }
+//
+//            displayedPhotos.isEmpty() -> {
+//                // Show No Items Found Text
+//                Text(
+//                    text = "No items found",
+//                    modifier = Modifier.fillMaxWidth(),
+//                    textAlign = TextAlign.Center,
+//                    style = MaterialTheme.typography.bodyMedium,
+//                    color = Color.Gray
+//                )
+//            }
+//
+//            else -> {
+//                LazyColumn {
+//                    items(displayedPhotos) { photo ->
+//                        PhotoItem(photo, onFavoriteClick = { viewModel.toggleFavorite(photo) })
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
 
 @Composable
 fun PhotoItem(photo: Photo, onFavoriteClick: () -> Unit) {

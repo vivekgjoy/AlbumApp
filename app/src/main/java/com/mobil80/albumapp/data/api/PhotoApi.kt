@@ -10,7 +10,7 @@ interface PhotoApi {
     @GET("v2/list")
     suspend fun getPhotos(
         @Query("page") page: Int,
-        @Query("limit") limit: Int = 30
+        @Query("limit") limit: Int = 100
     ): List<Photo>
 
     companion object {

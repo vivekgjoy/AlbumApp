@@ -33,6 +33,8 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
         fetchFavorites() // ✅ Load favorites initially
     }
 
+    val pagedPhotos = repository.getPagedPhotos().cachedIn(viewModelScope)
+
 //    val pagedPhotos = repository.getPagedPhotos().cachedIn(viewModelScope)
 
     fun fetchPhotos(page: Int) {

@@ -90,4 +90,6 @@ dependencies {
 
     val nav_version = "2.8.5"
     implementation ("androidx.navigation:navigation-compose:$nav_version")
+    implementation("com.google.accompanist:accompanist-swiperefresh:0.33.1-alpha")
+
 }
