@@ -1,5 +1,6 @@
 package com.mobil80.albumapp.presentation.activities
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -38,6 +39,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,11 +62,15 @@ import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.items
 import coil.compose.AsyncImage
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import com.mobil80.albumapp.R
 import com.mobil80.albumapp.data.api.PhotoApi
 import com.mobil80.albumapp.data.database.PhotoDatabase
 import com.mobil80.albumapp.data.model.Photo
 import com.mobil80.albumapp.data.repository.PhotoRepository
+import com.mobil80.albumapp.presentation.helper.Functions.isInternetAvailable
+import com.mobil80.albumapp.presentation.helper.Functions.showToast
 import com.mobil80.albumapp.presentation.ui.theme.AlbumAppTheme
 import com.mobil80.albumapp.presentation.viewmodels.PhotoViewModel
 
@@ -100,7 +107,7 @@ fun MainScreen(viewModel: PhotoViewModel) {
             startDestination = "photos",
             modifier = Modifier.padding(paddingValues) // Ensure proper padding for content
         ) {
-            composable("photos") { PhotoScreen(viewModel) }
+            composable("photos") { PhotoScreen(viewModel, LocalContext.current) }
             composable("favorites") { FavoritesScreen(viewModel) }
         }
     }
@@ -146,9 +153,21 @@ fun BottomNavigationBar(navController: NavController) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PhotoScreen(viewModel: PhotoViewModel) {
+fun PhotoScreen(viewModel: PhotoViewModel, context: Context) {
     val lazyPhotos = viewModel.pagedPhotos.collectAsLazyPagingItems()
     val searchQuery = remember { mutableStateOf("") }
+    val isRefreshing by remember { derivedStateOf { lazyPhotos.loadState.refresh is LoadState.Loading } }
+    val searchResults by viewModel.searchResults.collectAsState()
+
+    // Check internet connection
+    val isInternetAvailable = remember { isInternetAvailable(context) }
+
+    // Show toast if no internet connection
+    LaunchedEffect(isInternetAvailable) {
+        if (!isInternetAvailable) {
+            showToast(context)
+        }
+    }
 
     Column(modifier = Modifier.padding(8.dp)) {
 
@@ -166,6 +185,10 @@ fun PhotoScreen(viewModel: PhotoViewModel) {
                 .background(Color.LightGray.copy(alpha = 0.3f)),
             placeholder = { Text("Search by ID or Author") },
             singleLine = true,
+            colors = TextFieldDefaults.textFieldColors(
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            ),
             trailingIcon = {
                 if (searchQuery.value.isNotEmpty()) {
                     IconButton(onClick = { searchQuery.value = "" }) {
@@ -177,23 +200,47 @@ fun PhotoScreen(viewModel: PhotoViewModel) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        LazyColumn {
-            items(lazyPhotos) { photo ->
-                photo?.let {
-                    PhotoItem(it) { viewModel.toggleFavorite(it) }
+        SwipeRefresh(
+            state = rememberSwipeRefreshState(isRefreshing),
+            onRefresh = {
+                if (isInternetAvailable) {
+                    lazyPhotos.refresh() // Refresh the data
+                    searchQuery.value = "" // Clear search query on refresh
+                } else {
+                    showToast(context)
                 }
             }
+        ) {
+            LazyColumn {
+                // Show search results if search query is not empty
+                if (searchQuery.value.isNotEmpty()) {
+                    items(searchResults) { photo ->
+                        photo?.let {
+                            PhotoItem(it) { viewModel.toggleFavorite(it) }
+                        }
+                    }
+                } else {
+                    // Show paged photos if no search query
+                    items(lazyPhotos.itemCount) { index ->
+                        val photo = lazyPhotos[index]
+                        photo?.let {
+                            PhotoItem(it) { viewModel.toggleFavorite(it) }
+                        }
+                    }
 
-            lazyPhotos.apply {
-                when {
-                    loadState.refresh is LoadState.Loading -> {
-                        item { LoadingIndicator() }
-                    }
-                    loadState.append is LoadState.Loading -> {
-                        item { CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally)) }
-                    }
-                    loadState.append is LoadState.Error -> {
-                        item { Text("Failed to load more items", Modifier.align(Alignment.CenterHorizontally)) }
+                    // Handle loading and error states
+                    lazyPhotos.apply {
+                        when {
+                            loadState.refresh is LoadState.Loading -> {
+                                item { LoadingIndicator() }
+                            }
+                            loadState.append is LoadState.Loading -> {
+                                item { CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally)) }
+                            }
+                            loadState.append is LoadState.Error -> {
+                                item { Text("Failed to load more items", Modifier.align(Alignment.CenterHorizontally)) }
+                            }
+                        }
                     }
                 }
             }
@@ -204,17 +251,12 @@ fun PhotoScreen(viewModel: PhotoViewModel) {
 //@OptIn(ExperimentalMaterial3Api::class)
 //@Composable
 //fun PhotoScreen(viewModel: PhotoViewModel) {
-//    val photos by viewModel.photos.collectAsState()
-//    val searchResults by viewModel.searchResults.collectAsState()
+//    val lazyPhotos = viewModel.pagedPhotos.collectAsLazyPagingItems()
 //    val searchQuery = remember { mutableStateOf("") }
-//    val isLoading by viewModel.isLoading.collectAsState() // Observe loading state
-//
-//    LaunchedEffect(Unit) {
-//        viewModel.fetchPhotos(1)
-//    }
 //
 //    Column(modifier = Modifier.padding(8.dp)) {
 //
+//        // Search Bar
 //        TextField(
 //            value = searchQuery.value,
 //            onValueChange = {
@@ -233,11 +275,9 @@ fun PhotoScreen(viewModel: PhotoViewModel) {
 //                unfocusedIndicatorColor = Color.Transparent
 //            ),
 //            trailingIcon = {
-//                Row {
-//                    if (searchQuery.value.isNotEmpty()) {
-//                        IconButton(onClick = { searchQuery.value = "" }) {
-//                            Icon(Icons.Default.Close, contentDescription = "Clear Search")
-//                        }
+//                if (searchQuery.value.isNotEmpty()) {
+//                    IconButton(onClick = { searchQuery.value = "" }) {
+//                        Icon(Icons.Default.Close, contentDescription = "Clear Search")
 //                    }
 //                }
 //            }
@@ -245,28 +285,23 @@ fun PhotoScreen(viewModel: PhotoViewModel) {
 //
 //        Spacer(modifier = Modifier.height(8.dp))
 //
-//        val displayedPhotos = if (searchQuery.value.isEmpty()) photos else searchResults
-//        when {
-//            isLoading -> {
-//                // Show Loading Indicator (3 Dots Animation)
-//                LoadingIndicator()
+//        LazyColumn {
+//            items(lazyPhotos) { photo ->
+//                photo?.let {
+//                    PhotoItem(it) { viewModel.toggleFavorite(it) }
+//                }
 //            }
 //
-//            displayedPhotos.isEmpty() -> {
-//                // Show No Items Found Text
-//                Text(
-//                    text = "No items found",
-//                    modifier = Modifier.fillMaxWidth(),
-//                    textAlign = TextAlign.Center,
-//                    style = MaterialTheme.typography.bodyMedium,
-//                    color = Color.Gray
-//                )
-//            }
-//
-//            else -> {
-//                LazyColumn {
-//                    items(displayedPhotos) { photo ->
-//                        PhotoItem(photo, onFavoriteClick = { viewModel.toggleFavorite(photo) })
+//            lazyPhotos.apply {
+//                when {
+//                    loadState.refresh is LoadState.Loading -> {
+//                        item { LoadingIndicator() }
+//                    }
+//                    loadState.append is LoadState.Loading -> {
+//                        item { CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally)) }
+//                    }
+//                    loadState.append is LoadState.Error -> {
+//                        item { Text("Failed to load more items", Modifier.align(Alignment.CenterHorizontally)) }
 //                    }
 //                }
 //            }
@@ -353,7 +388,6 @@ fun FavoritesScreen(viewModel: PhotoViewModel) {
         }
     }
 }
-
 
 // Loading Indicator (3 Dots Animation)
 @Composable

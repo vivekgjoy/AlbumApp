@@ -27,24 +27,21 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
 
     val isLoading = MutableStateFlow(true)
 
-    val isFavoritesLoading = MutableStateFlow(true) // Add this to ViewModel
+    val isFavoritesLoading = MutableStateFlow(true)
 
     init {
-        fetchFavorites() // ✅ Load favorites initially
+        fetchFavorites()
     }
 
     val pagedPhotos = repository.getPagedPhotos().cachedIn(viewModelScope)
-
-//    val pagedPhotos = repository.getPagedPhotos().cachedIn(viewModelScope)
 
     fun fetchPhotos(page: Int) {
         viewModelScope.launch {
             isLoading.value = true
             repository.getPhotos(page).collectLatest { photosList ->
-                val favoriteIds = _favorites.value.map { it.id }.toSet() // ✅ Always check latest favorites
-
+                val favoriteIds = _favorites.value.map { it.id }.toSet()
                 _photos.value = photosList.map {
-                    it.copy(isFavorite = favoriteIds.contains(it.id)) // ✅ Ensure favorite status persists
+                    it.copy(isFavorite = favoriteIds.contains(it.id))
                 }
                 isLoading.value = false
             }
@@ -56,12 +53,9 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
             isFavoritesLoading.value = true
             repository.getFavorites().collectLatest { favList ->
                 _favorites.value = favList
-
-                // ✅ Also update _photos list to reflect new favorites
                 _photos.value = _photos.value.map {
                     it.copy(isFavorite = favList.any { fav -> fav.id == it.id })
                 }
-
                 isFavoritesLoading.value = false
             }
         }
@@ -70,31 +64,32 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
     fun toggleFavorite(photo: Photo) {
         viewModelScope.launch(Dispatchers.IO) {
             val updatedPhoto = photo.copy(isFavorite = !photo.isFavorite)
-
-            // ✅ Update repository (Database or API)
             repository.updateFavorite(updatedPhoto)
 
-            // ✅ Fetch the latest favorites from repository to ensure sync
+            // Update favorites list
             val updatedFavorites = repository.getFavorites().first()
+            _favorites.value = updatedFavorites
 
-            withContext(Dispatchers.Main) {
-                _favorites.value = updatedFavorites
+            // Update photos list to reflect favorite changes
+            _photos.value = _photos.value.map {
+                if (it.id == photo.id) it.copy(isFavorite = !it.isFavorite) else it
+            }
 
-                // ✅ Update _photos list to reflect favorite changes
-                _photos.value = _photos.value.map {
-                    it.copy(isFavorite = updatedFavorites.any { fav -> fav.id == it.id })
-                }
+            // Update search results if the photo is in the search results
+            _searchResults.value = _searchResults.value.map {
+                if (it.id == photo.id) it.copy(isFavorite = !it.isFavorite) else it
             }
         }
     }
 
     fun searchPhotos(query: String) {
-        viewModelScope.launch(Dispatchers.IO) { // ✅ Run in background thread
-            val results = repository.searchPhotos(query)
-
-            withContext(Dispatchers.Main) { // ✅ Update UI on main thread
-                _searchResults.value = results
+        viewModelScope.launch(Dispatchers.IO) {
+            val results = if (query.isEmpty()) {
+                emptyList() // Clear search results if query is empty
+            } else {
+                repository.searchPhotos(query) // Fetch search results
             }
+            _searchResults.value = results
         }
     }
 }
