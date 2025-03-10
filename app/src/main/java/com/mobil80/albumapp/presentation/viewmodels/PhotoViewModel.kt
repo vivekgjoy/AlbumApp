@@ -1,5 +1,6 @@
 package com.mobil80.albumapp.presentation.viewmodels
 
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.cachedIn
@@ -26,8 +27,10 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
     val searchResults: StateFlow<List<Photo>> = _searchResults.asStateFlow()
 
     val isLoading = MutableStateFlow(true)
-
     val isFavoritesLoading = MutableStateFlow(true)
+
+    // Track favorite states for paged photos
+    private val _favoriteStates = mutableStateMapOf<String, Boolean>() // Photo ID to isFavorite
 
     init {
         fetchFavorites()
@@ -70,14 +73,17 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
             val updatedFavorites = repository.getFavorites().first()
             _favorites.value = updatedFavorites
 
+            // Update favorite state in the map
+            _favoriteStates[photo.id] = updatedPhoto.isFavorite
+
             // Update photos list to reflect favorite changes
             _photos.value = _photos.value.map {
-                if (it.id == photo.id) it.copy(isFavorite = !it.isFavorite) else it
+                if (it.id == photo.id) it.copy(isFavorite = updatedPhoto.isFavorite) else it
             }
 
             // Update search results if the photo is in the search results
             _searchResults.value = _searchResults.value.map {
-                if (it.id == photo.id) it.copy(isFavorite = !it.isFavorite) else it
+                if (it.id == photo.id) it.copy(isFavorite = updatedPhoto.isFavorite) else it
             }
         }
     }
@@ -91,5 +97,10 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
             }
             _searchResults.value = results
         }
+    }
+
+    // Get the favorite state for a photo
+    fun isFavorite(photoId: String): Boolean {
+        return _favoriteStates[photoId] ?: false
     }
 }

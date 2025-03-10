@@ -216,7 +216,10 @@ fun PhotoScreen(viewModel: PhotoViewModel, context: Context) {
                 if (searchQuery.value.isNotEmpty()) {
                     items(searchResults) { photo ->
                         photo?.let {
-                            PhotoItem(it) { viewModel.toggleFavorite(it) }
+                            PhotoItem(
+                                photo = it.copy(isFavorite = viewModel.isFavorite(it.id)),
+                                onFavoriteClick = { viewModel.toggleFavorite(it) }
+                            )
                         }
                     }
                 } else {
@@ -224,7 +227,10 @@ fun PhotoScreen(viewModel: PhotoViewModel, context: Context) {
                     items(lazyPhotos.itemCount) { index ->
                         val photo = lazyPhotos[index]
                         photo?.let {
-                            PhotoItem(it) { viewModel.toggleFavorite(it) }
+                            PhotoItem(
+                                photo = it.copy(isFavorite = viewModel.isFavorite(it.id)),
+                                onFavoriteClick = { viewModel.toggleFavorite(it) }
+                            )
                         }
                     }
 
