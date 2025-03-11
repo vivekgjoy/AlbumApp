@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class PhotoViewModel(
     private val repository: PhotoRepository,
@@ -41,8 +40,6 @@ class PhotoViewModel(
     }
 
     val isInternetAvailable: StateFlow<Boolean> = networkObserver.isInternetAvailable
-
-    // Other ViewModel code...
 
     override fun onCleared() {
         super.onCleared()

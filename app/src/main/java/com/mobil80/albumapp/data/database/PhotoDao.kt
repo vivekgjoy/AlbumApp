@@ -25,7 +25,7 @@ interface PhotoDao {
     fun insertPhotos(photos: List<Photo>)
 
     @Query("SELECT * FROM photos")
-    fun getAllPhotos(): Flow<List<Photo>> // ✅ Must return Flow for Room + Flow support
+    fun getAllPhotos(): Flow<List<Photo>>
 
     @Query("SELECT * FROM photos WHERE isFavorite = 1")
     fun getFavoritePhotos(): Flow<List<Photo>>
