@@ -4,6 +4,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.cachedIn
+import com.mobil80.albumapp.core.NetworkObserver
 import com.mobil80.albumapp.data.model.Photo
 import com.mobil80.albumapp.data.repository.PhotoRepository
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +16,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
+class PhotoViewModel(
+    private val repository: PhotoRepository,
+    private val networkObserver: NetworkObserver
+) : ViewModel() {
 
     private val _favorites = MutableStateFlow<List<Photo>>(emptyList())
     val favorites: StateFlow<List<Photo>> = _favorites
@@ -34,6 +38,15 @@ class PhotoViewModel(private val repository: PhotoRepository) : ViewModel() {
 
     init {
         fetchFavorites()
+    }
+
+    val isInternetAvailable: StateFlow<Boolean> = networkObserver.isInternetAvailable
+
+    // Other ViewModel code...
+
+    override fun onCleared() {
+        super.onCleared()
+        networkObserver.unregister()
     }
 
     val pagedPhotos = repository.getPagedPhotos().cachedIn(viewModelScope)
